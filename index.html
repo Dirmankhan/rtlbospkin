@@ -66,7 +66,6 @@
     background:var(--surface-2); color:var(--text);
   }
   .field input:focus, .field select:focus{outline:2px solid var(--primary); outline-offset:-1px; background:var(--surface);}
-  .search-field{flex:2 1 220px;}
   .reset-btn{
     padding:8px 14px; border-radius:8px; border:1px solid var(--border); background:var(--surface);
     color:var(--text-muted); font-size:13px; cursor:pointer; white-space:nowrap;
@@ -92,13 +91,6 @@
     display:inline-block; padding:2px 9px; border-radius:999px; font-size:11.5px; font-weight:600;
     background:var(--primary-soft); color:var(--primary-dark); white-space:nowrap;
   }
-  .status-pill{
-    display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:999px;
-    font-size:11.5px; font-weight:600; white-space:nowrap;
-  }
-  .status-lengkap{background:var(--success-soft); color:var(--success);}
-  .status-belum{background:var(--warn-soft); color:var(--warn);}
-  .dot{width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block;}
 
   .action-btn{
     display:inline-flex; align-items:center; gap:6px; padding:6px 11px; border-radius:8px;
@@ -208,10 +200,6 @@
 
   <div class="panel">
     <div class="filters">
-      <div class="field search-field">
-        <label>Cari</label>
-        <input type="text" id="fSearch" placeholder="Nama peserta, sekolah, atau NPSN..." />
-      </div>
       <div class="field">
         <label>Kab/Kota</label>
         <select id="fKabKota"><option value="">Semua</option></select>
@@ -225,12 +213,8 @@
         <select id="fJenis"><option value="">Semua</option></select>
       </div>
       <div class="field">
-        <label>Status RTL</label>
-        <select id="fStatus">
-          <option value="">Semua</option>
-          <option value="lengkap">Lengkap</option>
-          <option value="belum">Belum Lengkap</option>
-        </select>
+        <label>Gugus</label>
+        <select id="fGugus"><option value="">Semua</option></select>
       </div>
       <button class="reset-btn" id="resetBtn" type="button">Reset Filter</button>
     </div>
@@ -245,7 +229,6 @@
             <th>Kab/Kota</th>
             <th>Sekolah</th>
             <th>Gugus</th>
-            <th>Status</th>
             <th>Dokumen RTL</th>
             <th>Hasil RTL</th>
           </tr>
@@ -297,9 +280,6 @@ function driveIdFromUrl(url){
 function escapeHtml(s){
   return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
-function isComplete(row){
-  return !!(row.doc_url && row.hasil_rtl_url);
-}
 
 /* ====== populate filter dropdowns ====== */
 function uniqueSorted(arr){ return [...new Set(arr.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'id')); }
@@ -308,6 +288,7 @@ function initFilters(){
   const kab = uniqueSorted(RTL_DATA.map(r=>r.kab_kota));
   const jenjang = uniqueSorted(RTL_DATA.map(r=>r.jenjang_sekolah));
   const jenis = uniqueSorted(RTL_DATA.map(r=>r.jenis_bimtek));
+  const gugus = uniqueSorted(RTL_DATA.map(r=>r.nama_gugus));
   const fill = (sel, items) => {
     items.forEach(v=>{
       const o = document.createElement('option');
@@ -318,6 +299,7 @@ function initFilters(){
   fill(document.getElementById('fKabKota'), kab);
   fill(document.getElementById('fJenjang'), jenjang);
   fill(document.getElementById('fJenis'), jenis);
+  fill(document.getElementById('fGugus'), gugus);
 }
 
 /* ====== stats ====== */
@@ -325,13 +307,12 @@ function renderStats(rows){
   const totalPeserta = rows.length;
   const totalSekolah = new Set(rows.map(r=>r.npsn).filter(Boolean)).size;
   const totalKab = new Set(rows.map(r=>r.kab_kota).filter(Boolean)).size;
-  const lengkap = rows.filter(isComplete).length;
-  const pct = totalPeserta ? Math.round((lengkap/totalPeserta)*100) : 0;
+  const totalGugus = new Set(rows.map(r=>r.nama_gugus).filter(Boolean)).size;
   const cards = [
     {label:'Total Peserta', value: totalPeserta, sub:'peserta bimtek'},
     {label:'Total Sekolah', value: totalSekolah, sub:'sekolah unik (NPSN)'},
     {label:'Kab/Kota', value: totalKab, sub:'wilayah terdata'},
-    {label:'RTL Lengkap', value: pct+'%', sub: lengkap+' dari '+totalPeserta+' peserta'},
+    {label:'Total Gugus', value: totalGugus, sub:'gugus terdata'},
   ];
   document.getElementById('statsRow').innerHTML = cards.map(c=>`
     <div class="stat-card">
@@ -344,10 +325,6 @@ function renderStats(rows){
 
 /* ====== table ====== */
 function rowHtml(r, idx){
-  const complete = isComplete(r);
-  const statusHtml = complete
-    ? `<span class="status-pill status-lengkap"><span class="dot"></span>Lengkap</span>`
-    : `<span class="status-pill status-belum"><span class="dot"></span>Belum Lengkap</span>`;
   const docBtn = r.doc_url
     ? `<button class="action-btn" onclick="openModal(${idx})">&#128065; Lihat &amp; Unduh</button>`
     : `<span class="muted-x">&mdash; belum diunggah</span>`;
@@ -368,7 +345,6 @@ function rowHtml(r, idx){
         <div class="npsn">${escapeHtml(r.jenjang_sekolah)}${r.npsn ? ' &middot; NPSN '+escapeHtml(r.npsn) : ''}</div>
       </td>
       <td>${escapeHtml(r.nama_gugus)}</td>
-      <td>${statusHtml}</td>
       <td>${docBtn}</td>
       <td>${hasilBtn}</td>
     </tr>
@@ -378,22 +354,16 @@ function rowHtml(r, idx){
 let currentFiltered = [];
 
 function applyFilters(){
-  const q = document.getElementById('fSearch').value.trim().toLowerCase();
   const kab = document.getElementById('fKabKota').value;
   const jenjang = document.getElementById('fJenjang').value;
   const jenis = document.getElementById('fJenis').value;
-  const status = document.getElementById('fStatus').value;
+  const gugus = document.getElementById('fGugus').value;
 
   currentFiltered = RTL_DATA.filter(r=>{
     if(kab && r.kab_kota !== kab) return false;
     if(jenjang && r.jenjang_sekolah !== jenjang) return false;
     if(jenis && r.jenis_bimtek !== jenis) return false;
-    if(status === 'lengkap' && !isComplete(r)) return false;
-    if(status === 'belum' && isComplete(r)) return false;
-    if(q){
-      const hay = [r.nama_peserta, r.nama_sekolah, r.npsn, r.nama_gugus, r.kab_kota].join(' ').toLowerCase();
-      if(!hay.includes(q)) return false;
-    }
+    if(gugus && r.nama_gugus !== gugus) return false;
     return true;
   });
 
@@ -469,16 +439,14 @@ document.getElementById('overlay').addEventListener('click', (e)=>{
 document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeModal(); });
 
 /* ====== wire up filters ====== */
-['fSearch','fKabKota','fJenjang','fJenis','fStatus'].forEach(id=>{
-  document.getElementById(id).addEventListener('input', applyFilters);
+['fKabKota','fJenjang','fJenis','fGugus'].forEach(id=>{
   document.getElementById(id).addEventListener('change', applyFilters);
 });
 document.getElementById('resetBtn').addEventListener('click', ()=>{
-  document.getElementById('fSearch').value='';
   document.getElementById('fKabKota').value='';
   document.getElementById('fJenjang').value='';
   document.getElementById('fJenis').value='';
-  document.getElementById('fStatus').value='';
+  document.getElementById('fGugus').value='';
   applyFilters();
 });
 
