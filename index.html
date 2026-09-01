@@ -260,12 +260,12 @@
         <table class="data">
           <thead>
             <tr>
-              <th>Peserta</th>
-              <th>Jenis Bimtek</th>
               <th>Tanggal</th>
               <th>Kab/Kota</th>
-              <th>Sekolah</th>
               <th>Gugus</th>
+              <th>Sekolah</th>
+              <th>Jenis Bimtek</th>
+              <th>Peserta</th>
               <th>Dokumen RTL</th>
               <th>Hasil RTL</th>
             </tr>
@@ -469,18 +469,18 @@ function rowHtml(r, idx){
     : `<span class="muted-x">&mdash; belum ada</span>`;
   return `
     <tr>
-      <td class="name-cell">
-        <div class="name">${escapeHtml(r.nama_peserta)}</div>
-        <div class="role">${escapeHtml(r.jabatan_peserta)}</div>
-      </td>
-      <td><span class="badge">${escapeHtml(r.jenis_bimtek)}</span></td>
       <td>${escapeHtml(r.tanggal_bimtek)}</td>
       <td>${escapeHtml(r.kab_kota)}</td>
+      <td>${escapeHtml(r.nama_gugus)}</td>
       <td class="school-cell">
         <div class="school">${escapeHtml(r.nama_sekolah)}</div>
         <div class="npsn">${escapeHtml(r.jenjang_sekolah)}${r.npsn ? ' &middot; NPSN '+escapeHtml(r.npsn) : ''}</div>
       </td>
-      <td>${escapeHtml(r.nama_gugus)}</td>
+      <td><span class="badge">${escapeHtml(r.jenis_bimtek)}</span></td>
+      <td class="name-cell">
+        <div class="name">${escapeHtml(r.nama_peserta)}</div>
+        <div class="role">${escapeHtml(r.jabatan_peserta)}</div>
+      </td>
       <td>${docBtn}</td>
       <td>${hasilBtn}</td>
     </tr>
