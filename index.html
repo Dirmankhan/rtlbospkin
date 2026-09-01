@@ -417,25 +417,37 @@ function uniqueSortedDates(arr){
   });
 }
 
+function fillSelect(sel, items){
+  while(sel.options.length > 1) sel.remove(1);
+  items.forEach(v=>{
+    const o = document.createElement('option');
+    o.value = v; o.textContent = v;
+    sel.appendChild(o);
+  });
+}
+
+/* Gugus options narrow to whichever Kab/Kota is currently selected. */
+function updateGugusOptions(){
+  const kabSel = document.getElementById('fKabKota');
+  const gugusSel = document.getElementById('fGugus');
+  const kab = kabSel.value;
+  const relevant = kab ? RTL_DATA.filter(r=>r.kab_kota === kab) : RTL_DATA;
+  const gugus = uniqueSorted(relevant.map(r=>r.nama_gugus));
+  const previous = gugusSel.value;
+  fillSelect(gugusSel, gugus);
+  gugusSel.value = gugus.includes(previous) ? previous : '';
+}
+
 function initFilters(){
   const kab = uniqueSorted(RTL_DATA.map(r=>r.kab_kota));
   const jenjang = uniqueSorted(RTL_DATA.map(r=>r.jenjang_sekolah));
   const jenis = uniqueSorted(RTL_DATA.map(r=>r.jenis_bimtek));
-  const gugus = uniqueSorted(RTL_DATA.map(r=>r.nama_gugus));
   const tanggal = uniqueSortedDates(RTL_DATA.map(r=>r.tanggal_bimtek));
-  const fill = (sel, items) => {
-    while(sel.options.length > 1) sel.remove(1);
-    items.forEach(v=>{
-      const o = document.createElement('option');
-      o.value = v; o.textContent = v;
-      sel.appendChild(o);
-    });
-  };
-  fill(document.getElementById('fKabKota'), kab);
-  fill(document.getElementById('fJenjang'), jenjang);
-  fill(document.getElementById('fJenis'), jenis);
-  fill(document.getElementById('fGugus'), gugus);
-  fill(document.getElementById('fTanggal'), tanggal);
+  fillSelect(document.getElementById('fKabKota'), kab);
+  fillSelect(document.getElementById('fJenjang'), jenjang);
+  fillSelect(document.getElementById('fJenis'), jenis);
+  fillSelect(document.getElementById('fTanggal'), tanggal);
+  updateGugusOptions();
 }
 
 /* ====== stats ====== */
@@ -577,15 +589,19 @@ document.getElementById('overlay').addEventListener('click', (e)=>{
 document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeModal(); });
 
 /* ====== wire up filters ====== */
-['fKabKota','fJenjang','fJenis','fGugus','fTanggal'].forEach(id=>{
+['fJenjang','fJenis','fGugus','fTanggal'].forEach(id=>{
   document.getElementById(id).addEventListener('change', applyFilters);
+});
+document.getElementById('fKabKota').addEventListener('change', ()=>{
+  updateGugusOptions();
+  applyFilters();
 });
 document.getElementById('resetBtn').addEventListener('click', ()=>{
   document.getElementById('fKabKota').value='';
   document.getElementById('fJenjang').value='';
   document.getElementById('fJenis').value='';
-  document.getElementById('fGugus').value='';
   document.getElementById('fTanggal').value='';
+  updateGugusOptions();
   applyFilters();
 });
 
