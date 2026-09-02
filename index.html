@@ -60,6 +60,7 @@
   }
   .filters{padding:16px 18px 20px; margin-bottom:8px; border-bottom:1px solid var(--border); display:flex; flex-wrap:wrap; gap:10px; align-items:end;}
   .field{display:flex; flex-direction:column; gap:5px; min-width:0; flex:1 1 120px; max-width:200px;}
+  .search-field{flex:1 1 200px; max-width:280px;}
   .field label{font-size:11.5px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:.02em;}
   .field input, .field select{
     width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:8px; font-size:13.5px;
@@ -233,6 +234,10 @@
 
     <div class="panel">
       <div class="filters">
+        <div class="field search-field">
+          <label>Cari NPSN / Nama Sekolah</label>
+          <input type="text" id="fSearch" placeholder="Ketik NPSN atau nama sekolah..." />
+        </div>
         <div class="field">
           <label>Tanggal</label>
           <select id="fTanggal"><option value="">Semua</option></select>
@@ -502,6 +507,7 @@ function rowHtml(r, idx){
 let currentFiltered = [];
 
 function applyFilters(){
+  const q = document.getElementById('fSearch').value.trim().toLowerCase();
   const kab = document.getElementById('fKabKota').value;
   const jenjang = document.getElementById('fJenjang').value;
   const jenis = document.getElementById('fJenis').value;
@@ -514,6 +520,10 @@ function applyFilters(){
     if(jenis && r.jenis_bimtek !== jenis) return false;
     if(gugus && r.nama_gugus !== gugus) return false;
     if(tanggal && r.tanggal_bimtek !== tanggal) return false;
+    if(q){
+      const hay = (r.npsn + ' ' + r.nama_sekolah).toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
     return true;
   });
 
@@ -589,6 +599,7 @@ document.getElementById('overlay').addEventListener('click', (e)=>{
 document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeModal(); });
 
 /* ====== wire up filters ====== */
+document.getElementById('fSearch').addEventListener('input', applyFilters);
 ['fJenjang','fJenis','fGugus','fTanggal'].forEach(id=>{
   document.getElementById(id).addEventListener('change', applyFilters);
 });
@@ -597,6 +608,7 @@ document.getElementById('fKabKota').addEventListener('change', ()=>{
   applyFilters();
 });
 document.getElementById('resetBtn').addEventListener('click', ()=>{
+  document.getElementById('fSearch').value='';
   document.getElementById('fKabKota').value='';
   document.getElementById('fJenjang').value='';
   document.getElementById('fJenis').value='';
