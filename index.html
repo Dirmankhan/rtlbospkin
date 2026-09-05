@@ -373,10 +373,48 @@ function csvRowsToData(rows){
     }));
 }
 
-async function loadData(){
-  document.getElementById('loadingState').style.display = 'flex';
+const CACHE_KEY = 'rtl_dashboard_cache_v1';
+
+function readCache(){
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if(!raw) return null;
+    const parsed = JSON.parse(raw);
+    if(!parsed || !Array.isArray(parsed.data) || !parsed.data.length) return null;
+    return parsed;
+  } catch(e){ return null; }
+}
+
+function writeCache(data, generatedAt){
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ data, generatedAt }));
+  } catch(e){ /* storage full or unavailable; live view still works without it */ }
+}
+
+function renderFromCurrentData(note){
+  document.getElementById('loadingState').style.display = 'none';
   document.getElementById('errorState').style.display = 'none';
-  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+  document.getElementById('metaNote').textContent =
+    'Data per ' + GENERATED_AT + ' \u00b7 ' + RTL_DATA.length + ' respons' + (note ? ' ' + note : '');
+  initFilters();
+  applyFilters();
+}
+
+async function loadData(){
+  const cached = readCache();
+  const usedCache = !!cached;
+
+  if(usedCache){
+    RTL_DATA = cached.data;
+    GENERATED_AT = cached.generatedAt;
+    renderFromCurrentData('(memuat data terbaru\u2026)');
+  } else {
+    document.getElementById('loadingState').style.display = 'flex';
+    document.getElementById('errorState').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'none';
+  }
+
   try {
     const res = await fetch(CSV_URL, { cache: 'no-store' });
     if(!res.ok) throw new Error('HTTP ' + res.status + ' saat mengambil data.');
@@ -387,16 +425,16 @@ async function loadData(){
     const rows = parseCSV(text);
     RTL_DATA = csvRowsToData(rows);
     GENERATED_AT = new Date().toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' });
-
-    document.getElementById('loadingState').style.display = 'none';
-    document.getElementById('mainContent').style.display = 'block';
-    document.getElementById('metaNote').textContent = 'Data per ' + GENERATED_AT + ' \u00b7 ' + RTL_DATA.length + ' respons';
-    initFilters();
-    applyFilters();
+    writeCache(RTL_DATA, GENERATED_AT);
+    renderFromCurrentData();
   } catch(err){
-    document.getElementById('loadingState').style.display = 'none';
-    document.getElementById('errorState').style.display = 'flex';
-    document.getElementById('errorDetail').textContent = err.message || String(err);
+    if(usedCache){
+      renderFromCurrentData('(gagal memperbarui \u2014 menampilkan data tersimpan: ' + (err.message || String(err)) + ')');
+    } else {
+      document.getElementById('loadingState').style.display = 'none';
+      document.getElementById('errorState').style.display = 'flex';
+      document.getElementById('errorDetail').textContent = err.message || String(err);
+    }
   }
 }
 
