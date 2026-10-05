@@ -67,6 +67,26 @@
     background:var(--surface-2); color:var(--text);
   }
   .field input:focus, .field select:focus{outline:2px solid var(--primary); outline-offset:-1px; background:var(--surface);}
+  .ms-field{position:relative;}
+  .ms-toggle{
+    width:100%; text-align:left; padding:8px 10px; border:1px solid var(--border); border-radius:8px;
+    font-size:13.5px; background:var(--surface-2); color:var(--text); cursor:pointer;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .ms-toggle:focus, .ms-toggle.open{outline:2px solid var(--primary); outline-offset:-1px; background:var(--surface);}
+  .ms-toggle::after{content:'▾'; float:right; color:var(--text-muted); font-size:11px; margin-left:6px;}
+  .ms-panel{
+    display:none; position:absolute; top:calc(100% + 4px); left:0; min-width:180px; max-height:240px;
+    overflow-y:auto; background:var(--surface); border:1px solid var(--border); border-radius:8px;
+    box-shadow:var(--shadow); padding:6px; z-index:30;
+  }
+  .ms-panel.open{display:block;}
+  .ms-option{
+    display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; cursor:pointer;
+    font-size:13.5px; white-space:nowrap;
+  }
+  .ms-option:hover{background:var(--surface-2);}
+  .ms-option input{margin:0; cursor:pointer;}
   .reset-btn{
     flex:0 0 auto;
     padding:8px 14px; border-radius:8px; border:1px solid var(--border); background:var(--surface);
@@ -234,29 +254,30 @@
 
     <div class="panel">
       <div class="filters">
-        <div class="field search-field">
-          <label>Cari NPSN / Nama Sekolah</label>
-          <input type="text" id="fSearch" placeholder="Ketik NPSN atau nama sekolah..." />
-        </div>
         <div class="field">
           <label>Tanggal</label>
           <select id="fTanggal"><option value="">Semua</option></select>
         </div>
         <div class="field">
+          <label>Jenis Bimtek</label>
+          <select id="fJenis"><option value="">Semua</option></select>
+        </div>
+        <div class="field">
           <label>Kab/Kota</label>
           <select id="fKabKota"><option value="">Semua</option></select>
+        </div>
+        <div class="field ms-field" id="fJenjangField">
+          <label>Jenjang Sekolah</label>
+          <button type="button" class="ms-toggle" id="fJenjangToggle">Semua</button>
+          <div class="ms-panel" id="fJenjangPanel"></div>
         </div>
         <div class="field">
           <label>Gugus</label>
           <select id="fGugus"><option value="">Semua</option></select>
         </div>
-        <div class="field">
-          <label>Jenjang Sekolah</label>
-          <select id="fJenjang"><option value="">Semua</option></select>
-        </div>
-        <div class="field">
-          <label>Jenis Bimtek</label>
-          <select id="fJenis"><option value="">Semua</option></select>
+        <div class="field search-field">
+          <label>Cari NPSN / Nama Sekolah</label>
+          <input type="text" id="fSearch" placeholder="Ketik NPSN atau nama sekolah..." />
         </div>
         <button class="reset-btn" id="resetBtn" type="button">Reset Filter</button>
       </div>
@@ -469,6 +490,52 @@ function fillSelect(sel, items){
   });
 }
 
+/* ====== Jenjang Sekolah multi-select ====== */
+let selectedJenjang = new Set();
+
+function updateJenjangToggleLabel(){
+  const btn = document.getElementById('fJenjangToggle');
+  if(selectedJenjang.size === 0) btn.textContent = 'Semua';
+  else if(selectedJenjang.size === 1) btn.textContent = [...selectedJenjang][0];
+  else btn.textContent = selectedJenjang.size + ' dipilih';
+}
+
+function renderJenjangOptions(){
+  const options = uniqueSorted(RTL_DATA.map(r=>r.jenjang_sekolah));
+  for(const v of [...selectedJenjang]){
+    if(!options.includes(v)) selectedJenjang.delete(v);
+  }
+  const panel = document.getElementById('fJenjangPanel');
+  panel.innerHTML = options.map((v,i)=>`
+    <label class="ms-option">
+      <input type="checkbox" value="${escapeHtml(v)}" id="fJenjangOpt${i}" ${selectedJenjang.has(v) ? 'checked' : ''} />
+      ${escapeHtml(v)}
+    </label>
+  `).join('');
+  panel.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      if(cb.checked) selectedJenjang.add(cb.value);
+      else selectedJenjang.delete(cb.value);
+      updateJenjangToggleLabel();
+      applyFilters();
+    });
+  });
+  updateJenjangToggleLabel();
+}
+
+document.getElementById('fJenjangToggle').addEventListener('click', (e)=>{
+  e.stopPropagation();
+  document.getElementById('fJenjangPanel').classList.toggle('open');
+  document.getElementById('fJenjangToggle').classList.toggle('open');
+});
+document.addEventListener('click', (e)=>{
+  const field = document.getElementById('fJenjangField');
+  if(!field.contains(e.target)){
+    document.getElementById('fJenjangPanel').classList.remove('open');
+    document.getElementById('fJenjangToggle').classList.remove('open');
+  }
+});
+
 /* Gugus options narrow to whichever Kab/Kota is currently selected. */
 function updateGugusOptions(){
   const kabSel = document.getElementById('fKabKota');
@@ -483,13 +550,12 @@ function updateGugusOptions(){
 
 function initFilters(){
   const kab = uniqueSorted(RTL_DATA.map(r=>r.kab_kota));
-  const jenjang = uniqueSorted(RTL_DATA.map(r=>r.jenjang_sekolah));
   const jenis = uniqueSorted(RTL_DATA.map(r=>r.jenis_bimtek));
   const tanggal = uniqueSortedDates(RTL_DATA.map(r=>r.tanggal_bimtek));
   fillSelect(document.getElementById('fKabKota'), kab);
-  fillSelect(document.getElementById('fJenjang'), jenjang);
   fillSelect(document.getElementById('fJenis'), jenis);
   fillSelect(document.getElementById('fTanggal'), tanggal);
+  renderJenjangOptions();
   updateGugusOptions();
 }
 
@@ -547,14 +613,13 @@ let currentFiltered = [];
 function applyFilters(){
   const q = document.getElementById('fSearch').value.trim().toLowerCase();
   const kab = document.getElementById('fKabKota').value;
-  const jenjang = document.getElementById('fJenjang').value;
   const jenis = document.getElementById('fJenis').value;
   const gugus = document.getElementById('fGugus').value;
   const tanggal = document.getElementById('fTanggal').value;
 
   currentFiltered = RTL_DATA.filter(r=>{
     if(kab && r.kab_kota !== kab) return false;
-    if(jenjang && r.jenjang_sekolah !== jenjang) return false;
+    if(selectedJenjang.size > 0 && !selectedJenjang.has(r.jenjang_sekolah)) return false;
     if(jenis && r.jenis_bimtek !== jenis) return false;
     if(gugus && r.nama_gugus !== gugus) return false;
     if(tanggal && r.tanggal_bimtek !== tanggal) return false;
@@ -638,7 +703,7 @@ document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeModal();
 
 /* ====== wire up filters ====== */
 document.getElementById('fSearch').addEventListener('input', applyFilters);
-['fJenjang','fJenis','fGugus','fTanggal'].forEach(id=>{
+['fJenis','fGugus','fTanggal'].forEach(id=>{
   document.getElementById(id).addEventListener('change', applyFilters);
 });
 document.getElementById('fKabKota').addEventListener('change', ()=>{
@@ -648,9 +713,10 @@ document.getElementById('fKabKota').addEventListener('change', ()=>{
 document.getElementById('resetBtn').addEventListener('click', ()=>{
   document.getElementById('fSearch').value='';
   document.getElementById('fKabKota').value='';
-  document.getElementById('fJenjang').value='';
   document.getElementById('fJenis').value='';
   document.getElementById('fTanggal').value='';
+  selectedJenjang.clear();
+  renderJenjangOptions();
   updateGugusOptions();
   applyFilters();
 });
