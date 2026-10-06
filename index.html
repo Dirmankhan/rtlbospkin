@@ -82,11 +82,13 @@
   }
   .ms-panel.open{display:block;}
   .ms-option{
-    display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; cursor:pointer;
+    display:flex; align-items:center; gap:9px; padding:7px 8px; border-radius:6px; cursor:pointer;
     font-size:13.5px; white-space:nowrap;
   }
   .ms-option:hover{background:var(--surface-2);}
-  .ms-option input{margin:0; cursor:pointer;}
+  .ms-option input[type="checkbox"]{
+    width:15px; height:15px; margin:0; flex-shrink:0; accent-color:var(--primary); cursor:pointer;
+  }
   .reset-btn{
     flex:0 0 auto;
     padding:8px 14px; border-radius:8px; border:1px solid var(--border); background:var(--surface);
@@ -94,7 +96,28 @@
   }
   .reset-btn:hover{background:var(--surface-2); color:var(--text);}
 
-  .result-count{padding:0 18px 14px; font-size:13px; color:var(--text-muted);}
+  .result-bar{
+    padding:0 18px 14px; display:flex; align-items:center; justify-content:space-between; gap:12px;
+  }
+  .result-count{font-size:13px; color:var(--text-muted);}
+  .export-field{position:relative;}
+  .export-toggle{
+    display:inline-flex; align-items:center; gap:7px; padding:7px 13px; border-radius:8px;
+    border:1px solid var(--border); background:var(--surface); color:var(--text);
+    font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap;
+  }
+  .export-toggle:hover, .export-toggle.open{background:var(--primary-soft); border-color:var(--primary); color:var(--primary-dark);}
+  .export-menu{
+    display:none; position:absolute; top:calc(100% + 4px); right:0; min-width:220px;
+    background:var(--surface); border:1px solid var(--border); border-radius:8px;
+    box-shadow:var(--shadow); padding:6px; z-index:30;
+  }
+  .export-menu.open{display:block;}
+  .export-item{
+    display:block; width:100%; text-align:left; padding:8px 10px; border:none; background:none;
+    border-radius:6px; cursor:pointer; font-size:13px; color:var(--text);
+  }
+  .export-item:hover{background:var(--surface-2);}
 
   table.data{width:100%; border-collapse:collapse; font-size:13.5px;}
   table.data thead th{
@@ -226,6 +249,7 @@
     color-scheme: dark;
   }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -281,7 +305,16 @@
         </div>
         <button class="reset-btn" id="resetBtn" type="button">Reset Filter</button>
       </div>
-      <div class="result-count" id="resultCount"></div>
+      <div class="result-bar">
+        <div class="result-count" id="resultCount"></div>
+        <div class="export-field" id="exportField">
+          <button type="button" class="export-toggle" id="exportToggle">&#11015; Export ke Excel</button>
+          <div class="export-menu" id="exportMenu">
+            <button type="button" class="export-item" id="exportFiltered">Unduh Data Terfilter (.xlsx)</button>
+            <button type="button" class="export-item" id="exportAll">Unduh Semua Data (.xlsx)</button>
+          </div>
+        </div>
+      </div>
       <div class="table-scroll">
         <table class="data">
           <thead>
@@ -710,6 +743,63 @@ document.getElementById('overlay').addEventListener('click', (e)=>{
   if(e.target.id === 'overlay') closeModal();
 });
 document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeModal(); });
+
+/* ====== export to excel ====== */
+function buildExportRows(rows){
+  return rows.map(r => ({
+    'Tanggal': r.tanggal_bimtek,
+    'Kab/Kota': r.kab_kota,
+    'Gugus': r.nama_gugus,
+    'Jenjang Sekolah': r.jenjang_sekolah,
+    'NPSN': r.npsn,
+    'Nama Sekolah': r.nama_sekolah,
+    'Jenis Bimtek': r.jenis_bimtek,
+    'Nama Peserta': r.nama_peserta,
+    'Jabatan Peserta': r.jabatan_peserta,
+    'Link Dokumen RTL': r.doc_url,
+    'Link Hasil RTL': r.hasil_rtl_url,
+  }));
+}
+
+function exportToExcel(rows, label){
+  if(typeof XLSX === 'undefined'){
+    alert('Gagal memuat pustaka Excel. Periksa koneksi internet lalu coba lagi.');
+    return;
+  }
+  if(!rows.length){
+    alert('Tidak ada data untuk diekspor.');
+    return;
+  }
+  const ws = XLSX.utils.json_to_sheet(buildExportRows(rows));
+  ws['!cols'] = [14,18,20,14,12,34,20,24,16,40,40].map(w => ({ wch: w }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'RTL Bimtek');
+  const ts = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, 'rtl-bimtek-' + label + '-' + ts + '.xlsx');
+}
+
+document.getElementById('exportToggle').addEventListener('click', (e)=>{
+  e.stopPropagation();
+  document.getElementById('exportMenu').classList.toggle('open');
+  document.getElementById('exportToggle').classList.toggle('open');
+});
+document.addEventListener('click', (e)=>{
+  const field = document.getElementById('exportField');
+  if(!field.contains(e.target)){
+    document.getElementById('exportMenu').classList.remove('open');
+    document.getElementById('exportToggle').classList.remove('open');
+  }
+});
+document.getElementById('exportFiltered').addEventListener('click', ()=>{
+  document.getElementById('exportMenu').classList.remove('open');
+  document.getElementById('exportToggle').classList.remove('open');
+  exportToExcel(currentFiltered, 'terfilter');
+});
+document.getElementById('exportAll').addEventListener('click', ()=>{
+  document.getElementById('exportMenu').classList.remove('open');
+  document.getElementById('exportToggle').classList.remove('open');
+  exportToExcel(RTL_DATA, 'semua');
+});
 
 /* ====== wire up filters ====== */
 document.getElementById('fSearch').addEventListener('input', applyFilters);
