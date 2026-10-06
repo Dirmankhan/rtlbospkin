@@ -493,6 +493,16 @@ function fillSelect(sel, items){
 /* ====== Jenjang Sekolah multi-select ====== */
 let selectedJenjang = new Set();
 
+/* Conventional jenjang order (matches dashboard header), not alphabetical. */
+const JENJANG_ORDER = ['PAUD','SD','SKB','PKBM','SMP','SMA','SMK','SLB'];
+function sortByJenjangOrder(arr){
+  const known = arr.filter(v => JENJANG_ORDER.includes(v));
+  const unknown = arr.filter(v => !JENJANG_ORDER.includes(v));
+  known.sort((a,b) => JENJANG_ORDER.indexOf(a) - JENJANG_ORDER.indexOf(b));
+  unknown.sort((a,b) => a.localeCompare(b,'id'));
+  return [...known, ...unknown];
+}
+
 function updateJenjangToggleLabel(){
   const btn = document.getElementById('fJenjangToggle');
   if(selectedJenjang.size === 0) btn.textContent = 'Semua';
@@ -501,7 +511,7 @@ function updateJenjangToggleLabel(){
 }
 
 function renderJenjangOptions(){
-  const options = uniqueSorted(RTL_DATA.map(r=>r.jenjang_sekolah));
+  const options = sortByJenjangOrder([...new Set(RTL_DATA.map(r=>r.jenjang_sekolah).filter(Boolean))]);
   for(const v of [...selectedJenjang]){
     if(!options.includes(v)) selectedJenjang.delete(v);
   }
